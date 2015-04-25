@@ -839,6 +839,29 @@ process_table_loop:
 process_id_found: 
 
 	COPY		*%G4		0
+	
+findnextprocess:
+	ADD	%G0	%G0	48
+	BNEQ	+loadnewProcess	*%G0	0
+	JUMP	findnextprocess	
+	
+loadnewprocess:
+	ADD	%G0	*%G0	44
+	COPY	%FP	*%GO
+	SUB	%G0	%G0	4
+	COPY	%SP	*%G0
+	SUB	%G0	%G0	4
+	COPY	%G5	*%G0
+	SUB	%G0	%G0	4
+	COPY	%G4	*%G0
+	SUB	%G0	%G0	4
+	COPY	%G3	*%G0
+	SUB	%G0	%G0	4
+	COPY	%G2	*%G0
+	SUB	%G0	%G0	4
+	COPY	%G1	*%G0
+	SUB	%G0	%G0	4
+	COPY	*+temp2	%G0	;save G0 cos we'll need to refer to it
 
 ;;;	Epilogue: Restore registers used on the stack
 
