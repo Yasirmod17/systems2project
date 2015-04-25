@@ -68,12 +68,22 @@ RAM_found:
  	SETIBR		+IB_IP
 	
 ;;; ; initialize the trap table entries to point to the appropriate interrupt handlers
-	COPY 		*+BUS_ERROR 		+bus_err_int_handler
+
 ;;; ; it looks like right now on a CLOCK_ALARM, the simulator will vector to what I set for the PERMISSION_VIOLATION interrupt
-	COPY 		*+PERMISSION_VIOLATION		+perm_int_handler
+;;; Added labels to include all of the interrupt handler functions and updated the copying of said label pointers to the traptable
+
+	COPY 		*+INVALID_ADDRESS 		+invadd_int_handler
+	COPY 		*+INVALID_REGISTER		+invreg_int_handler
+	COPY 		*+BUS_ERROR 			+bus_err_int_handler
 	COPY 		*+CLOCK_ALARM 			+clock_int_handler
-	COPY 		*+SYSTEM_CALL 			+sysc_int_handler
+	COPY		*+DIVIDE_BY_ZERO		+divbyzero_int_handler
+	COPY		*+OVERFLOW			+overflow_int_handler
 	COPY 		*+INVALID_INSTRUCTION 		+invinst_int_handler
+	COPY 		*+PERMISSION_VIOLATION		+perm_int_handler
+	COPY 		*+INVALID_SHIFT_AMOUNT 		+invshift_int_handler
+	COPY 		*+SYSTEM_CALL 			+sysc_int_handler
+	COPY 		*+INVALID_DEVICE_VALUE: 	+invdev_int_handler
+	COPY 		*+DEVICE_FAILURE 		+devfail_int_handler
 
 
 	
@@ -734,9 +744,46 @@ debugging_shit:
 ;;; ; ; ================================================================================================================================
 	;; INTERRUPT HANDLERS
 
+invadd_int_handler:
+
+invreg_int_handler:
+
+bus_err_int_handler:
+	COPY		%G5 		%G5
+	HALT
+	
+clock_int_handler:
+	COPY		%G1		%G1
+	HALT
+	
+divbyzero_int_handler:
+	
+
+overflow_int_handler:
+
+invinst_int_handler:
+	COPY		%G3		%G3
+	HALT
+	
+perm_int_handler:
+	COPY 		%G4		%G4
+	HALT
+	
+invshift_int_handler:
 	
 sysc_int_handler:
 ;;; ; ; Callee  Prologue: Preserve registers
+;;;	Inspects the value in register %G1 to determine to Create, Exit, or GetRomCount
+
+	BEQ		+sysc_int_create		%G1		1
+	BEQ		+sysc_int_exit			%G1		2
+	BEQ		+sysc_int_getRomCount		%G1		3
+
+sysc_int_create:
+
+;;; ; Caller Prologue to find device:
+;;; ; If not yet initialized, set the console base/limit statics.
+;;; ;             BNEQ            +print_init_loop        *+_static_console_base          0
 
 	SUBUS           %SP             %SP             4
 	COPY            *%SP            %G0
@@ -745,9 +792,6 @@ sysc_int_handler:
 	SUBUS           %SP             %SP             4
 	COPY            *%SP            %G4
 
-;;; ; Caller Prologue to find device:
-;;; ; If not yet initialized, set the console base/limit statics.
-;;; ;             BNEQ            +print_init_loop        *+_static_console_base          0
 	
 	SUBUS           %SP             %SP             12 ; Push pfp / ra / rv
 	COPY            *%SP            %FP 		   ; pFP = %FP
@@ -767,25 +811,77 @@ sysc_int_handler:
 	ADDUS		*+IB_IP			*+IB_IP			16
 	JUMPMD		*+IB_IP			0b110
 	
-clock_int_handler:
-	COPY		%G1		%G1
-	HALT
+	
+	
+sysc_int_exit:
+;;; ; Callee preserved registers: 
+;;; 	[%FP - 4]:  G4
+;;; ; Parameters: None
+;;; ; Caller preserved registers:
+;;; ;   [%FP + 0]:  FP
+;;; ; Return address:
+;;; ; Return value:
+;;; ;   None
+;;; Locals: %G4: Used to iterate through process table
 
-def_int_handler:
-	COPY		%G2		%G2
-	HALT
+;;;	Prologue: Preserve registers used on the stack
 
-invinst_int_handler:
-	COPY		%G3		%G3
-	HALT
+	SUBUS		%SP		%SP		4
+	COPY		*%SP		%G4
 
-perm_int_handler:
-	COPY 		%G4		%G4
-	HALT
+process_table_loop: 
 
-bus_err_int_handler:
-	COPY		%G5 		%G5
-	HALT
+	ADDUS		%G4		+_heap_process_table		4	; point to the first process id
+	BEQ		+process_id_found		%G4		+_current_process_id ; if ID matches  
+	ADDUS		%G4		%G4		48	; iterates to next ID in process table
+	JUMP		+process_table_loop
+	
+process_id_found: 
+
+	COPY		*%G4		0
+
+;;;	Epilogue: Restore registers used on the stack
+
+	COPY		%G4		*%SP
+	ADDUS		%SP		%SP		4
+
+		
+
+sysc_int_getRomCount: 
+
+;;;  Prologue: Preserve the registers used on the stack.
+	SUBUS		%SP		%SP		4
+	COPY		*%SP		%G0
+	SUBUS		%SP		%SP		4
+	COPY		*%SP		%G1
+	
+	SUBUS           %SP             %SP             8	; Push rv/ ra 
+	COPY		%G5		%SP			; %G5 = &ra	
+	SUBUS		%SP		%SP		4	; Push pFP
+	COPY            *%SP            %FP 		   	; pFP = %FP
+	COPY		%FP		%SP			; update %FP 
+	CALL		+GET_ROM_COUNT	*%G5			; return address saved 
+	
+	
+	
+;;;  Epilogue: Restore preserved registers, then return.
+	COPY		%G1		*%SP
+	ADDUS		%SP		%SP		4
+	COPY		%G0		*%SP
+	ADDUS		%SP		%SP		4
+	ADDUS		%G5		%FP		4 ; %G5 = &ra
+	JUMP		*%G5
+
+
+
+
+
+invdev_int_handler:
+
+
+devfail_int_handler:
+
+
 
 ;;; ; ; ; ================================================================================================================================
 ;;; ; ; ; Procedure: _heap_allocator
