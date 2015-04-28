@@ -3,7 +3,8 @@
 ;;; ; Conner Reilly / Tomal Hossain / Mohammed Ibrahim
 ;;; ;
 ;;; ; The assembly core that perform the basic initialization of the kernel, bootstrapping the installation of trap handlers and
-;;; ; configuring the kernel's memory space.
+;;; ; configuring the kernel's memory space. Also contains functions for CREATE, EXIT, GET_ROM_COUNT, PRINT system calls. 
+;;; ; Initializes a process table in the heap, so that you can load and run an arbitrary number of processes from ROMs.
 ;;; ;
 ;;; ; Spring 2015
 ;;; ; ================================================================================================================================
